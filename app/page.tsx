@@ -1,231 +1,272 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Download, Sparkles } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Camera, Image, Palette, Sparkles, Download, Edit2 } from 'lucide-react';
+import { platformSizes, styleTemplates, PlatformSize, StyleTemplate } from '@/lib/templates';
+import CoverPreview from '@/components/CoverPreview';
+import { exportToPNG } from '@/lib/canvas-utils';
 
-// 简化版模板数据
-const templates = [
-  {
-    id: 'beauty-01',
-    name: '清新淡妆',
-    category: 'beauty',
-    colors: {
-      background: ['#FFE4E8', '#FFF5F7'],
-      text: '#333333',
-      accent: '#FF2442',
-    },
-    fontSize: { title: 72, subtitle: 36 },
-  },
-  {
-    id: 'fashion-01',
-    name: '日常穿搭',
-    category: 'fashion',
-    colors: {
-      background: ['#FFF5EE', '#FFE4B5'],
-      text: '#333333',
-      accent: '#FF6B6B',
-    },
-    fontSize: { title: 56, subtitle: 32 },
-  },
-];
+interface GeneratedCover {
+  id: number;
+  title: string;
+  subtitle: string;
+  bgGradient: string;
+  textColor: string;
+  accentColor: string;
+  fontSize: number;
+  platform: PlatformSize;
+  style: StyleTemplate;
+}
 
 export default function Home() {
-  const [selectedTemplate, setSelectedTemplate] = useState(templates[0]);
-  const [title, setTitle] = useState('在这里输入标题');
-  const [subtitle, setSubtitle] = useState('添加副标题（可选）');
-  const [customColors, setCustomColors] = useState(selectedTemplate.colors);
+  // 状态管理
+  const [videoTitle, setVideoTitle] = useState('');
+  const [selectedPlatform, setSelectedPlatform] = useState<PlatformSize>(platformSizes[0]);
+  const [selectedStyle, setSelectedStyle] = useState<StyleTemplate>(styleTemplates[0]);
+  const [uploadedImages, setUploadedImages] = useState<{ keyframe?: string; person?: string; reference?: string }>({});
+  const [generatedCovers, setGeneratedCovers] = useState<GeneratedCover[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [editingCover, setEditingCover] = useState<number | null>(null);
 
-  const handleExport = async () => {
-    alert('导出功能需要安装依赖后才能使用。请先运行：npm install');
+  const previewRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
+
+  // 处理文件上传
+  const handleFileUpload = (type: 'keyframe' | 'person' | 'reference', event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setUploadedImages((prev) => ({ ...prev, [type]: e.target?.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // AI生成封面（模拟）
+  const handleGenerateCovers = async () => {
+    if (!videoTitle.trim()) {
+      alert('请输入视频标题或关键词！');
+      return;
+    }
+
+    setIsGenerating(true);
+
+    // 模拟AI生成延迟
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    // 生成3-4个方案
+    const variations = [
+      { subtitle: '方案A', fontSize: 72, colorShift: 0 },
+      { subtitle: '方案B', fontSize: 80, colorShift: 1 },
+      { subtitle: '方案C', fontSize: 68, colorShift: 2 },
+      { subtitle: '方案D', fontSize: 76, colorShift: 3 },
+    ];
+
+    const covers: GeneratedCover[] = variations.map((variant, index) => ({
+      id: Date.now() + index,
+      title: videoTitle,
+      subtitle: `${variant.subtitle} - ${selectedStyle.name}`,
+      bgGradient: styleTemplates[(styleTemplates.indexOf(selectedStyle) + variant.colorShift) % styleTemplates.length].bgGradient,
+      textColor: selectedStyle.textColor,
+      accentColor: selectedStyle.accentColor,
+      fontSize: variant.fontSize,
+      platform: selectedPlatform,
+      style: selectedStyle,
+    }));
+
+    setGeneratedCovers(covers);
+    setIsGenerating(false);
+  };
+
+  // 导出封面
+  const handleExport = (coverId: number) => {
+    const element = previewRefs.current[coverId];
+    if (element) {
+      const cover = generatedCovers.find((c) => c.id === coverId);
+      exportToPNG(element, `${cover?.title}_${cover?.platform.name}_${coverId}.png`);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-red-50">
-      {/* 顶部导航 */}
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
+      {/* 头部 */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-pink-500 rounded-lg flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">小红书封面生成器</h1>
-              <p className="text-sm text-gray-500">3分钟制作爆款封面</p>
-            </div>
-          </div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+            🎬 AI视频封面生成器
+          </h1>
+          <p className="text-gray-600 mt-1">一键生成多平台爆款封面 · 支持抖音/小红书/B站/YouTube</p>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-12 gap-8">
-          {/* 左侧编辑区 */}
-          <div className="col-span-4 space-y-6">
-            <div className="bg-white rounded-xl p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-gray-800 mb-4">文字内容</h2>
-              
-              <div className="space-y-4">
+        <div className="grid lg:grid-cols-3 gap-8">
+          {/* 左侧：输入区 */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* 1. 素材输入 */}
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <Edit2 className="w-5 h-5" />
+                1. 素材输入
+              </h2>
+
+              {/* 视频标题 */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">视频标题/关键词 *</label>
+                <textarea
+                  value={videoTitle}
+                  onChange={(e) => setVideoTitle(e.target.value)}
+                  placeholder="例如：7天瘦10斤的减肥食谱"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                  rows={3}
+                />
+              </div>
+
+              {/* 素材上传 */}
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-gray-700">素材上传（可选）</label>
+
+                {/* 视频关键帧 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    标题
+                  <label className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-purple-500 transition-colors">
+                    <Camera className="w-5 h-5 text-gray-500" />
+                    <span className="text-sm text-gray-600">上传视频关键帧</span>
+                    <input type="file" accept="image/*" onChange={(e) => handleFileUpload('keyframe', e)} className="hidden" />
                   </label>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="输入封面标题"
-                    maxLength={30}
-                  />
-                  <p className="text-xs text-gray-400 mt-1">{title.length}/30字</p>
+                  {uploadedImages.keyframe && <img src={uploadedImages.keyframe} alt="关键帧" className="mt-2 w-full h-24 object-cover rounded-lg" />}
                 </div>
 
+                {/* 人物图 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    副标题（可选）
+                  <label className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-purple-500 transition-colors">
+                    <Image className="w-5 h-5 text-gray-500" />
+                    <span className="text-sm text-gray-600">上传人物图</span>
+                    <input type="file" accept="image/*" onChange={(e) => handleFileUpload('person', e)} className="hidden" />
                   </label>
-                  <input
-                    type="text"
-                    value={subtitle}
-                    onChange={(e) => setSubtitle(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="添加副标题"
-                    maxLength={50}
-                  />
+                  {uploadedImages.person && <img src={uploadedImages.person} alt="人物" className="mt-2 w-full h-24 object-cover rounded-lg" />}
+                </div>
+
+                {/* 风格参考图 */}
+                <div>
+                  <label className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-purple-500 transition-colors">
+                    <Palette className="w-5 h-5 text-gray-500" />
+                    <span className="text-sm text-gray-600">上传风格参考图</span>
+                    <input type="file" accept="image/*" onChange={(e) => handleFileUpload('reference', e)} className="hidden" />
+                  </label>
+                  {uploadedImages.reference && <img src={uploadedImages.reference} alt="参考" className="mt-2 w-full h-24 object-cover rounded-lg" />}
                 </div>
               </div>
             </div>
 
-            <button
-              onClick={handleExport}
-              className="w-full bg-gradient-to-r from-red-500 to-pink-500 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
-            >
-              <Download className="w-5 h-5" />
-              导出封面（PNG）
-            </button>
-          </div>
-
-          {/* 中间预览区 */}
-          <div className="col-span-5 bg-white rounded-xl p-8 shadow-sm">
-            <h2 className="text-lg font-bold text-gray-800 mb-6">实时预览</h2>
-            
-            <div className="flex justify-center">
-              <div style={{ transform: 'scale(0.35)', transformOrigin: 'top center' }}>
-                <div
-                  style={{
-                    width: '1080px',
-                    height: '1440px',
-                    background: `linear-gradient(180deg, ${customColors.background[0]}, ${customColors.background[1]})`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    position: 'relative',
-                  }}
-                  className="shadow-2xl"
-                >
-                  <div className="text-center px-16">
-                    <h1
-                      style={{
-                        fontSize: '72px',
-                        color: customColors.text,
-                        fontWeight: 'bold',
-                        lineHeight: '1.3',
-                      }}
-                    >
-                      {title}
-                    </h1>
-                    {subtitle && (
-                      <p
-                        style={{
-                          fontSize: '36px',
-                          color: customColors.accent,
-                          fontWeight: '500',
-                          marginTop: '24px',
-                        }}
-                      >
-                        {subtitle}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 右侧模板库 */}
-          <div className="col-span-3">
-            <div className="bg-white rounded-xl p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-gray-800 mb-4">选择模板</h2>
-              
-              <div className="space-y-4">
-                {templates.map((template) => (
-                  <div
-                    key={template.id}
-                    onClick={() => {
-                      setSelectedTemplate(template);
-                      setCustomColors(template.colors);
-                    }}
-                    className={`cursor-pointer rounded-lg overflow-hidden transition-all duration-200 ${
-                      selectedTemplate.id === template.id
-                        ? 'ring-4 ring-red-500 scale-105'
-                        : 'hover:scale-105 shadow-sm'
+            {/* 2. 平台尺寸 */}
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold mb-4">2. 选择平台尺寸</h2>
+              <div className="grid grid-cols-2 gap-3">
+                {platformSizes.map((platform) => (
+                  <button
+                    key={platform.id}
+                    onClick={() => setSelectedPlatform(platform)}
+                    className={`p-4 rounded-xl border-2 transition-all ${
+                      selectedPlatform.id === platform.id
+                        ? 'border-purple-500 bg-purple-50 shadow-md'
+                        : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <div
-                      style={{
-                        width: '100%',
-                        height: '160px',
-                        background: `linear-gradient(180deg, ${template.colors.background[0]}, ${template.colors.background[1]})`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <p style={{ fontSize: '18px', color: template.colors.text, fontWeight: 'bold' }}>
-                        {template.name}
-                      </p>
-                    </div>
-                  </div>
+                    <div className="text-2xl mb-1">{platform.icon}</div>
+                    <div className="font-medium text-sm">{platform.name}</div>
+                    <div className="text-xs text-gray-500">{platform.ratio}</div>
+                  </button>
                 ))}
               </div>
             </div>
+
+            {/* 3. 风格选择 */}
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold mb-4">3. 选择风格</h2>
+              <div className="grid grid-cols-2 gap-3">
+                {styleTemplates.map((style) => (
+                  <button
+                    key={style.id}
+                    onClick={() => setSelectedStyle(style)}
+                    className={`p-4 rounded-xl border-2 transition-all ${
+                      selectedStyle.id === style.id ? 'border-purple-500 bg-purple-50 shadow-md' : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">{style.icon}</div>
+                    <div className="font-medium text-sm">{style.name}</div>
+                    <div className="text-xs text-gray-500">{style.category}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 4. 生成按钮 */}
+            <button
+              onClick={handleGenerateCovers}
+              disabled={isGenerating || !videoTitle.trim()}
+              className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <Sparkles className="w-5 h-5" />
+              {isGenerating ? '正在生成中...' : 'AI一键生成封面'}
+            </button>
           </div>
-        </div>
 
-        {/* 底部说明 */}
-        <div className="mt-12 bg-white rounded-xl p-8 shadow-sm">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">📚 使用说明</h2>
-          
-          <div className="grid grid-cols-4 gap-6">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-3xl">1️⃣</span>
-              </div>
-              <h3 className="font-bold text-gray-800 mb-2">选择模板</h3>
-              <p className="text-sm text-gray-600">从右侧选择喜欢的模板</p>
-            </div>
+          {/* 右侧：生成结果 */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold mb-6">生成结果</h2>
 
-            <div className="text-center">
-              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-3xl">2️⃣</span>
-              </div>
-              <h3 className="font-bold text-gray-800 mb-2">编辑内容</h3>
-              <p className="text-sm text-gray-600">输入标题和副标题</p>
-            </div>
+              {generatedCovers.length === 0 ? (
+                <div className="text-center py-20">
+                  <Sparkles className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                  <p className="text-gray-500">填写信息后点击"AI一键生成封面"</p>
+                  <p className="text-sm text-gray-400 mt-2">将为您生成3-4个不同风格的封面方案</p>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-6">
+                  {generatedCovers.map((cover) => (
+                    <div key={cover.id} className="group relative">
+                      {/* 封面预览 */}
+                      <div className="relative overflow-hidden rounded-xl shadow-md border-2 border-gray-200 group-hover:border-purple-500 transition-colors">
+                        <div
+                          ref={(el) => {
+                            previewRefs.current[cover.id] = el;
+                          }}
+                          style={{ transform: 'scale(0.35)', transformOrigin: 'top left' }}
+                        >
+                          <CoverPreview
+                            title={cover.title}
+                            subtitle={cover.subtitle}
+                            bgGradient={cover.bgGradient}
+                            textColor={cover.textColor}
+                            accentColor={cover.accentColor}
+                            fontSize={cover.fontSize}
+                            layout="center"
+                          />
+                        </div>
+                      </div>
 
-            <div className="text-center">
-              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-3xl">3️⃣</span>
-              </div>
-              <h3 className="font-bold text-gray-800 mb-2">实时预览</h3>
-              <p className="text-sm text-gray-600">查看封面效果</p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-3xl">4️⃣</span>
-              </div>
-              <h3 className="font-bold text-gray-800 mb-2">一键导出</h3>
-              <p className="text-sm text-gray-600">下载PNG图片</p>
+                      {/* 操作按钮 */}
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() => handleExport(cover.id)}
+                          className="flex-1 py-2 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <Download className="w-4 h-4" />
+                          下载
+                        </button>
+                        <button
+                          onClick={() => setEditingCover(cover.id)}
+                          className="py-2 px-4 border-2 border-gray-300 rounded-lg hover:border-purple-500 transition-colors flex items-center gap-2"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                          编辑
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
